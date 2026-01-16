@@ -1,0 +1,26 @@
+#!/usr/bin/with-contenv bash
+
+# Creality Print Auto-Update initialization script
+# Runs on container start to check for and install updates
+
+echo "**** Checking for Creality Print updates ****"
+
+# Run the auto-update script
+/usr/local/bin/creality-autoupdate
+
+# Verify installation
+INSTALL_DIR="${CREALITY_INSTALL_DIR:-/opt/crealityprint}"
+if [ -f "$INSTALL_DIR/VERSION" ]; then
+    VERSION=$(cat "$INSTALL_DIR/VERSION")
+    echo "**** Creality Print version: $VERSION ****"
+else
+    echo "**** WARNING: Could not determine Creality Print version ****"
+fi
+
+# Ensure proper permissions
+if [ -d "$INSTALL_DIR" ]; then
+    chown -R abc:abc "$INSTALL_DIR" 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/AppRun" 2>/dev/null || true
+fi
+
+echo "**** Creality Print update check complete ****"

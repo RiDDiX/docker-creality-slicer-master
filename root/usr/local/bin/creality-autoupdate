@@ -1,0 +1,132 @@
+#!/bin/bash
+
+# Creality Print Auto-Update Script
+# Checks for new versions and updates on container restart
+
+INSTALL_DIR="${CREALITY_INSTALL_DIR:-/opt/crealityprint}"
+VERSION_FILE="$INSTALL_DIR/VERSION"
+UPDATE_LOCK="/tmp/creality-update.lock"
+LOG_PREFIX="[CREALITY-UPDATE]"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $LOG_PREFIX $1"
+}
+
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $LOG_PREFIX ERROR: $1" >&2
+}
+
+# Get current installed version
+get_installed_version() {
+    if [ -f "$VERSION_FILE" ]; then
+        cat "$VERSION_FILE"
+    else
+        echo "unknown"
+    fi
+}
+
+# Get latest version from GitHub
+get_latest_version() {
+    curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
+        | jq -r '.tag_name' 2>/dev/null
+}
+
+# Get download URL for latest AppImage
+get_download_url() {
+    curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
+        | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url' 2>/dev/null
+}
+
+# Download and install new version
+install_update() {
+    local version=$1
+    local download_url=$2
+    
+    log "Downloading Creality Print $version..."
+    
+    # Create temp directory
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+    
+    # Download AppImage
+    if ! curl -L -o crealityprint.AppImage "$download_url"; then
+        log_error "Failed to download AppImage"
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+    
+    chmod +x crealityprint.AppImage
+    
+    # Extract AppImage
+    log "Extracting AppImage..."
+    if ! ./crealityprint.AppImage --appimage-extract; then
+        log_error "Failed to extract AppImage"
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+    
+    # Backup old installation
+    if [ -d "$INSTALL_DIR" ]; then
+        log "Backing up old installation..."
+        rm -rf "${INSTALL_DIR}.bak"
+        mv "$INSTALL_DIR" "${INSTALL_DIR}.bak"
+    fi
+    
+    # Install new version
+    log "Installing new version..."
+    mv squashfs-root "$INSTALL_DIR"
+    echo "$version" > "$VERSION_FILE"
+    
+    # Set permissions
+    chmod +x "$INSTALL_DIR/AppRun"
+    
+    # Cleanup
+    rm -rf "$TEMP_DIR"
+    rm -rf "${INSTALL_DIR}.bak"
+    
+    log "Successfully updated to Creality Print $version"
+    return 0
+}
+
+# Main update check
+check_and_update() {
+    # Acquire lock to prevent concurrent updates
+    exec 201>"$UPDATE_LOCK"
+    if ! flock -n 201; then
+        log "Update already in progress, skipping..."
+        return 0
+    fi
+    
+    log "Checking for Creality Print updates..."
+    
+    INSTALLED_VERSION=$(get_installed_version)
+    LATEST_VERSION=$(get_latest_version)
+    
+    if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+        log_error "Failed to fetch latest version from GitHub"
+        return 1
+    fi
+    
+    log "Installed version: $INSTALLED_VERSION"
+    log "Latest version: $LATEST_VERSION"
+    
+    if [ "$INSTALLED_VERSION" = "$LATEST_VERSION" ]; then
+        log "Already running the latest version"
+        return 0
+    fi
+    
+    log "New version available: $LATEST_VERSION"
+    
+    DOWNLOAD_URL=$(get_download_url)
+    if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+        log_error "Failed to get download URL"
+        return 1
+    fi
+    
+    install_update "$LATEST_VERSION" "$DOWNLOAD_URL"
+    return $?
+}
+
+# Run update check
+check_and_update
+exit $?
