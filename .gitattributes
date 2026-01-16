@@ -1,0 +1,7 @@
+# Ensure all shell scripts and s6-overlay files use LF line endings
+*.sh text eol=lf
+root/usr/local/bin/* text eol=lf
+root/etc/s6-overlay/** text eol=lf
+root/defaults/autostart text eol=lf
+root/defaults/autostart_wayland text eol=lf
+Dockerfile text eol=lf

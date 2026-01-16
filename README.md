@@ -2,7 +2,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/RiDDiX/docker-creality-slicer-master.svg?style=for-the-badge&logo=github)](https://github.com/RiDDiX/docker-creality-slicer-master)
 [![GitHub Release](https://img.shields.io/github/release/RiDDiX/docker-creality-slicer-master.svg?style=for-the-badge&logo=github)](https://github.com/RiDDiX/docker-creality-slicer-master/releases)
-[![GitHub Package](https://img.shields.io/badge/ghcr.io-RiDDiX%2Fcreality--slicer-blue?style=for-the-badge&logo=github)](https://github.com/RiDDiX/docker-creality-slicer-master/pkgs/container/creality-slicer)
+[![GitHub Package](https://img.shields.io/badge/ghcr.io-RiDDiX%2Fdocker--creality--slicer--master-blue?style=for-the-badge&logo=github)](https://github.com/RiDDiX/docker-creality-slicer-master/pkgs/container/docker-creality-slicer-master)
 [![Docker Build](https://img.shields.io/github/actions/workflow/status/RiDDiX/docker-creality-slicer-master/docker-build.yml?style=for-the-badge&logo=github-actions)](https://github.com/RiDDiX/docker-creality-slicer-master/actions)
 
 > **Docker container for [Creality Print](https://github.com/CrealityOfficial/CrealityPrint)** with Intel/Nvidia GPU support, stability improvements, and **automatic updates on every container restart**.
@@ -28,7 +28,7 @@
 ```yaml
 services:
   crealityprint:
-    image: ghcr.io/riddix/creality-slicer:latest
+    image: ghcr.io/riddix/docker-creality-slicer-master:latest
     container_name: crealityprint
     environment:
       - PUID=1000
@@ -63,7 +63,7 @@ docker run -d \
   --device /dev/dri:/dev/dri \
   --shm-size=2g \
   --restart unless-stopped \
-  ghcr.io/riddix/creality-slicer:latest
+  ghcr.io/riddix/docker-creality-slicer-master:latest
 ```
 
 ### Nvidia GPU Support
@@ -71,7 +71,7 @@ docker run -d \
 ```yaml
 services:
   crealityprint:
-    image: ghcr.io/riddix/creality-slicer:latest
+    image: ghcr.io/riddix/docker-creality-slicer-master:latest
     container_name: crealityprint
     environment:
       - PUID=1000
@@ -111,6 +111,93 @@ This container automatically checks for and installs the latest Creality Print v
 4. Creality Print starts with the latest version
 
 No manual intervention required - just restart your container to get updates!
+
+## Stability Watchdog
+
+The container includes an intelligent watchdog service that monitors Creality Print and automatically recovers from common issues:
+
+### How it Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Watchdog Service                         │
+├─────────────────────────────────────────────────────────────┤
+│  Every 30 seconds:                                          │
+│  ├─ Check if Creality Print process is running              │
+│  ├─ Monitor memory usage (threshold: 80% of available RAM)  │
+│  ├─ Detect UI hangs via X11 window responsiveness           │
+│  └─ Check for zombie/defunct processes                      │
+│                                                             │
+│  On issue detected:                                         │
+│  ├─ Log the issue with timestamp                            │
+│  ├─ Graceful termination attempt (SIGTERM)                  │
+│  ├─ Force kill after 10s timeout (SIGKILL)                  │
+│  └─ Automatic restart of Creality Print                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Monitored Conditions
+
+| Condition | Detection | Action |
+|-----------|-----------|--------|
+| **Process Crash** | Process not found | Restart immediately |
+| **Memory Leak** | RAM usage > 80% | Graceful restart |
+| **UI Freeze** | X11 window unresponsive for 60s | Force restart |
+| **Zombie Process** | Defunct process state | Clean up and restart |
+| **Settings Hang** | Known OpenGL deadlock pattern | Force restart |
+
+### Logs
+
+Watchdog logs are available in the container:
+```bash
+docker exec crealityprint cat /config/logs/watchdog.log
+```
+
+## Memory Management
+
+Creality Print (like many Qt/OpenGL applications) can experience memory issues, especially with Intel iGPUs. This container implements several optimizations:
+
+### Memory Optimizations
+
+| Optimization | Environment Variable | Effect |
+|--------------|---------------------|--------|
+| **malloc Trim Threshold** | `MALLOC_TRIM_THRESHOLD_=131072` | Forces glibc to return memory to OS more aggressively |
+| **mmap Threshold** | `MALLOC_MMAP_THRESHOLD_=131072` | Uses mmap for smaller allocations (easier to free) |
+| **Shader Cache Limit** | `MESA_SHADER_CACHE_MAX_SIZE=512M` | Prevents unbounded shader cache growth |
+| **Threaded GL Disabled** | `mesa_glthread=false` | Avoids race conditions in GL driver |
+
+### Shader Cache Management
+
+The container automatically manages Mesa's shader cache:
+
+1. **On startup**: Clears corrupted shader cache entries
+2. **During runtime**: Limits cache to 512MB
+3. **On memory pressure**: Watchdog triggers cache cleanup
+
+### Shared Memory (shm_size)
+
+WebGL and GPU acceleration require sufficient shared memory:
+
+| Setting | Use Case |
+|---------|----------|
+| `shm_size: 1gb` | Basic usage, small models |
+| `shm_size: 2gb` | **Recommended** - Normal usage |
+| `shm_size: 4gb` | Large models, frequent settings changes |
+| `shm_size: 8gb` | Heavy usage, multiple large projects |
+
+### Preventing Common Issues
+
+**Freeze when changing settings:**
+- Root cause: OpenGL context recreation deadlock
+- Solution: Watchdog detects and restarts automatically
+
+**Gradual slowdown over time:**
+- Root cause: Memory fragmentation / shader cache bloat
+- Solution: Memory management settings + periodic restart
+
+**Out of memory crashes:**
+- Root cause: Insufficient shared memory
+- Solution: Increase `shm_size` in docker-compose.yml
 
 ## Intel iGPU Optimization
 
@@ -178,7 +265,7 @@ shm_size: 2gb
 ```bash
 git clone https://github.com/RiDDiX/docker-creality-slicer-master.git
 cd docker-creality-slicer-master
-docker build -t ghcr.io/riddix/creality-slicer:latest .
+docker build -t ghcr.io/riddix/docker-creality-slicer-master:latest .
 ```
 
 ## Credits

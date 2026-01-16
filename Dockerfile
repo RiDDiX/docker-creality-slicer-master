@@ -5,12 +5,11 @@ FROM ghcr.io/linuxserver/baseimage-selkies:ubuntunoble
 # set version label
 ARG BUILD_DATE
 ARG VERSION
-ARG ORCASLICER_VERSION
-LABEL build_version="Linuxserver.io version:- ${VERSION} Build-date:- ${BUILD_DATE}"
-LABEL maintainer="thelamer"
+LABEL build_version="RiDDiX Creality Slicer version:- ${VERSION} Build-date:- ${BUILD_DATE}"
+LABEL maintainer="RiDDiX"
 
 # title
-ENV TITLE=OrcaSlicer \
+ENV TITLE="Creality Print" \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
     NO_GAMEPAD=true \
     # Intel iGPU optimizations
@@ -25,13 +24,18 @@ ENV TITLE=OrcaSlicer \
     MALLOC_MMAP_THRESHOLD_=131072 \
     # Reduce Mesa shader cache memory pressure
     MESA_SHADER_CACHE_MAX_SIZE=512M \
-    MESA_SHADER_CACHE_DISABLE=false
+    MESA_SHADER_CACHE_DISABLE=false \
+    # Creality Print installation path
+    CREALITY_INSTALL_DIR=/opt/crealityprint
 
 RUN \
-  echo "**** add icon ****" && \
+  echo "**** add Creality Print icon ****" && \
   curl -o \
-    /usr/share/selkies/www/icon.png \
-    https://raw.githubusercontent.com/linuxserver/docker-templates/master/linuxserver.io/img/orcaslicer-logo.png && \
+    /usr/share/selkies/www/icon.png -L \
+    "https://raw.githubusercontent.com/CrealityOfficial/CrealityPrint/main/resources/icons/CrealityPrint.png" || \
+  curl -o \
+    /usr/share/selkies/www/icon.png -L \
+    "https://avatars.githubusercontent.com/u/44064182?s=200&v=4" && \
   echo "**** install Intel iGPU packages ****" && \
   apt-get update && \
   DEBIAN_FRONTEND=noninteractive \
@@ -73,23 +77,24 @@ RUN \
     gstreamer1.0-x \
     libgstreamer-plugins-bad1.0 \
     libwebkit2gtk-4.1-0 \
-    libwx-perl && \
-  echo "**** install orcaslicer from appimage ****" && \
-  if [ -z ${ORCASLICER_VERSION+x} ]; then \
-    ORCASLICER_VERSION=$(curl -sX GET "https://api.github.com/repos/OrcaSlicer/OrcaSlicer/releases/latest" \
-    | awk '/tag_name/{print $4;exit}' FS='[""]'); \
-  fi && \
-  RELEASE_URL=$(curl -sX GET "https://api.github.com/repos/OrcaSlicer/OrcaSlicer/releases/latest"     | awk '/url/{print $4;exit}' FS='[""]') && \
-  DOWNLOAD_URL=$(curl -sX GET "${RELEASE_URL}" | awk '/browser_download_url.*Ubuntu2404/{print $4;exit}' FS='[""]') && \
+    libwx-perl \
+    jq \
+    fuse \
+    libfuse2 && \
+  echo "**** install initial Creality Print from AppImage ****" && \
+  CREALITY_VERSION=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
+    | jq -r '.tag_name') && \
+  DOWNLOAD_URL=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
+    | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url') && \
+  echo "Installing Creality Print ${CREALITY_VERSION} from ${DOWNLOAD_URL}" && \
   cd /tmp && \
-  curl -o \
-    /tmp/orca.app -L \
-    "${DOWNLOAD_URL}" && \
-  chmod +x /tmp/orca.app && \
-  ./orca.app --appimage-extract && \
-  mv squashfs-root /opt/orcaslicer && \
+  curl -o /tmp/crealityprint.AppImage -L "${DOWNLOAD_URL}" && \
+  chmod +x /tmp/crealityprint.AppImage && \
+  ./crealityprint.AppImage --appimage-extract && \
+  mv squashfs-root /opt/crealityprint && \
+  echo "${CREALITY_VERSION}" > /opt/crealityprint/VERSION && \
   localedef -i en_GB -f UTF-8 en_GB.UTF-8 && \
-  printf "Linuxserver.io version: ${VERSION}\nBuild-date: ${BUILD_DATE}" > /build_version && \
+  printf "RiDDiX Creality Slicer version: ${VERSION}\nBuild-date: ${BUILD_DATE}" > /build_version && \
   echo "**** cleanup ****" && \
   apt-get autoclean && \
   rm -rf \
@@ -103,9 +108,11 @@ RUN \
 COPY /root /
 
 # make scripts executable
-RUN chmod +x /usr/local/bin/orcaslicer-wrapper && \
+RUN chmod +x /usr/local/bin/crealityprint-wrapper && \
+    chmod +x /usr/local/bin/creality-autoupdate && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-intel-gpu/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/svc-orca-watchdog/run
+    chmod +x /etc/s6-overlay/s6-rc.d/init-creality-update/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/run
 
 # ports and volumes
 EXPOSE 3001

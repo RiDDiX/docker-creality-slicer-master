@@ -1,6 +1,6 @@
 services:
   crealityprint:
-    image: ghcr.io/riddix/creality-slicer:latest
+    image: ghcr.io/riddix/docker-creality-slicer-master:latest
     container_name: crealityprint
     environment:
       - PUID=1000
