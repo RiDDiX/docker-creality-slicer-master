@@ -9,30 +9,33 @@ if [ -f /etc/profile.d/intel-gpu.sh ]; then
 fi
 
 # Ensure persistent storage for Creality Print settings
-# Creality Print stores printer configs in ~/.config and ~/.local/share
+# Fix any broken symlinks in /config first (from previous buggy versions)
+for path in /config/.config/CrealityPrint /config/.local/share/CrealityPrint /config/.config/Creality /config/.cache; do
+    if [ -L "$path" ]; then
+        echo "Removing broken symlink: $path"
+        rm -f "$path"
+    fi
+done
+
+# Create real directories in /config
 mkdir -p /config/.config/CrealityPrint
 mkdir -p /config/.local/share/CrealityPrint
+mkdir -p /config/.config/Creality
 mkdir -p /config/.cache
 
 # Create symlinks from home directory to /config for persistence
-if [ ! -L "$HOME/.config/CrealityPrint" ]; then
-    mkdir -p "$HOME/.config"
-    rm -rf "$HOME/.config/CrealityPrint"
-    ln -sf /config/.config/CrealityPrint "$HOME/.config/CrealityPrint"
-fi
+mkdir -p "$HOME/.config"
+mkdir -p "$HOME/.local/share"
 
-if [ ! -L "$HOME/.local/share/CrealityPrint" ]; then
-    mkdir -p "$HOME/.local/share"
-    rm -rf "$HOME/.local/share/CrealityPrint"
-    ln -sf /config/.local/share/CrealityPrint "$HOME/.local/share/CrealityPrint"
-fi
+# Remove any existing files/dirs and create symlinks
+rm -rf "$HOME/.config/CrealityPrint" 2>/dev/null
+ln -sf /config/.config/CrealityPrint "$HOME/.config/CrealityPrint"
 
-# Also handle Creality (alternative config path)
-mkdir -p /config/.config/Creality
-if [ ! -L "$HOME/.config/Creality" ]; then
-    rm -rf "$HOME/.config/Creality"
-    ln -sf /config/.config/Creality "$HOME/.config/Creality"
-fi
+rm -rf "$HOME/.local/share/CrealityPrint" 2>/dev/null
+ln -sf /config/.local/share/CrealityPrint "$HOME/.local/share/CrealityPrint"
+
+rm -rf "$HOME/.config/Creality" 2>/dev/null
+ln -sf /config/.config/Creality "$HOME/.config/Creality"
 
 # Set XDG directories to ensure apps use /config
 export XDG_CONFIG_HOME=/config/.config
