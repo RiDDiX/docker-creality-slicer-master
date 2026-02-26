@@ -80,7 +80,8 @@ RUN \
     libwx-perl \
     jq \
     fuse \
-    libfuse2 && \
+    libfuse2 \
+    dos2unix && \
   echo "**** install initial Creality Print from AppImage ****" && \
   CREALITY_VERSION=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
     | jq -r '.tag_name') && \
@@ -107,8 +108,18 @@ RUN \
 # add local files
 COPY /root /
 
-# make scripts executable
-RUN chmod +x /usr/local/bin/crealityprint-wrapper && \
+# fix line endings and make scripts executable
+RUN dos2unix /usr/local/bin/crealityprint-wrapper && \
+    dos2unix /usr/local/bin/creality-autoupdate && \
+    dos2unix /etc/s6-overlay/s6-rc.d/init-intel-gpu/run && \
+    dos2unix /etc/s6-overlay/s6-rc.d/init-creality-update/run && \
+    dos2unix /etc/s6-overlay/s6-rc.d/init-creality-update/up && \
+    dos2unix /etc/s6-overlay/s6-rc.d/init-creality-update/type && \
+    dos2unix /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/run && \
+    dos2unix /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/type && \
+    dos2unix /defaults/autostart && \
+    dos2unix /defaults/autostart_wayland && \
+    chmod +x /usr/local/bin/crealityprint-wrapper && \
     chmod +x /usr/local/bin/creality-autoupdate && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-intel-gpu/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-creality-update/run && \
