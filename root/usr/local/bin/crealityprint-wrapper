@@ -8,6 +8,37 @@ if [ -f /etc/profile.d/intel-gpu.sh ]; then
     source /etc/profile.d/intel-gpu.sh
 fi
 
+# Ensure persistent storage for Creality Print settings
+# Creality Print stores printer configs in ~/.config and ~/.local/share
+mkdir -p /config/.config/CrealityPrint
+mkdir -p /config/.local/share/CrealityPrint
+mkdir -p /config/.cache
+
+# Create symlinks from home directory to /config for persistence
+if [ ! -L "$HOME/.config/CrealityPrint" ]; then
+    mkdir -p "$HOME/.config"
+    rm -rf "$HOME/.config/CrealityPrint"
+    ln -sf /config/.config/CrealityPrint "$HOME/.config/CrealityPrint"
+fi
+
+if [ ! -L "$HOME/.local/share/CrealityPrint" ]; then
+    mkdir -p "$HOME/.local/share"
+    rm -rf "$HOME/.local/share/CrealityPrint"
+    ln -sf /config/.local/share/CrealityPrint "$HOME/.local/share/CrealityPrint"
+fi
+
+# Also handle Creality (alternative config path)
+mkdir -p /config/.config/Creality
+if [ ! -L "$HOME/.config/Creality" ]; then
+    rm -rf "$HOME/.config/Creality"
+    ln -sf /config/.config/Creality "$HOME/.config/Creality"
+fi
+
+# Set XDG directories to ensure apps use /config
+export XDG_CONFIG_HOME=/config/.config
+export XDG_DATA_HOME=/config/.local/share
+export XDG_CACHE_HOME=/config/.cache
+
 # Set process limits to prevent runaway memory usage
 ulimit -v 8388608  # 8GB virtual memory limit
 ulimit -m 4194304  # 4GB resident memory limit

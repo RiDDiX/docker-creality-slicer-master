@@ -101,6 +101,26 @@ The application can be accessed at:
 - **HTTPS (recommended)**: https://yourhost:3001/
 - **HTTP**: http://yourhost:3000/
 
+## Persistent Storage
+
+All Creality Print settings, including **printer configurations**, profiles, and preferences are automatically persisted in the `/config` volume:
+
+```
+/config/
+├── .config/
+│   ├── CrealityPrint/    # Printer settings, profiles, preferences
+│   └── Creality/         # Alternative config location
+├── .local/
+│   └── share/
+│       └── CrealityPrint/ # User data, custom profiles
+├── .cache/               # Shader cache, temporary data
+└── logs/                 # Watchdog and application logs
+```
+
+**Important:** The container creates symlinks from the user's home directory to `/config` on startup. This ensures all settings survive container rebuilds and updates.
+
+If you previously lost printer settings, simply restart the container after this update - future rebuilds will preserve your configuration.
+
 ## Auto-Update Feature
 
 This container automatically checks for and installs the latest Creality Print version **on every container restart**. The update process:
