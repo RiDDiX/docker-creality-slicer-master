@@ -43,7 +43,7 @@ services:
       - 3001:3001
     devices:
       - /dev/dri:/dev/dri
-    shm_size: 2gb
+    shm_size: 4gb
     restart: unless-stopped
 ```
 
@@ -61,7 +61,7 @@ docker run -d \
   -p 3001:3001 \
   -v /path/to/config:/config \
   --device /dev/dri:/dev/dri \
-  --shm-size=2g \
+  --shm-size=4g \
   --restart unless-stopped \
   ghcr.io/riddix/docker-creality-slicer-master:latest
 ```
@@ -91,7 +91,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    shm_size: 2gb
+    shm_size: 4gb
     restart: unless-stopped
 ```
 
@@ -243,7 +243,7 @@ environment:
   - DRI_NODE=/dev/dri/renderD128
 devices:
   - /dev/dri:/dev/dri
-shm_size: 2gb
+shm_size: 4gb
 ```
 
 ### Troubleshooting GPU Issues

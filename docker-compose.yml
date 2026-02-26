@@ -16,5 +16,5 @@ services:
       - 3001:3001
     devices:
       - /dev/dri:/dev/dri
-    shm_size: 2gb
+    shm_size: 4gb
     restart: unless-stopped
