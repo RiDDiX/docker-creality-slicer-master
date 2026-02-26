@@ -43,12 +43,18 @@ jobs:
           fi
           
           PRERELEASE_VERSION=$(echo "$PRERELEASE_DATA" | jq -r '.tag_name')
-          PRERELEASE_URL=$(echo "$PRERELEASE_DATA" | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url')
+          PRERELEASE_URL=$(echo "$PRERELEASE_DATA" | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url' | head -1)
           
           echo "prerelease_version=${PRERELEASE_VERSION}" >> $GITHUB_OUTPUT
-          echo "prerelease_url=${PRERELEASE_URL}" >> $GITHUB_OUTPUT
+          # Use heredoc syntax for URL to handle special characters
+          {
+            echo "prerelease_url<<EOF"
+            echo "${PRERELEASE_URL}"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
           echo "has_prerelease=true" >> $GITHUB_OUTPUT
           echo "Latest Creality Print pre-release: ${PRERELEASE_VERSION}"
+          echo "Download URL: ${PRERELEASE_URL}"
 
       - name: Check if pre-release image exists
         if: steps.creality_prerelease.outputs.has_prerelease == 'true'
