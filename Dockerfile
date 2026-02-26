@@ -86,7 +86,7 @@ RUN \
   CREALITY_VERSION=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
     | jq -r '.tag_name') && \
   DOWNLOAD_URL=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
-    | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url') && \
+    | jq -r '.assets[] | select(.name | endswith(".AppImage")) | select(.name | contains("x86_64")) | .browser_download_url') && \
   echo "Installing Creality Print ${CREALITY_VERSION} from ${DOWNLOAD_URL}" && \
   cd /tmp && \
   curl -o /tmp/crealityprint.AppImage -L "${DOWNLOAD_URL}" && \
