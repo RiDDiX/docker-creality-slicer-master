@@ -20,6 +20,16 @@
 - **Memory Management**: Prevents freezes during settings changes
 - **Shader Cache Management**: Automatic cleanup to prevent memory bloat
 - **Web-based GUI**: Access Creality Print from any browser via HTTPS
+- **Pre-Release Support**: Optional access to the latest pre-release versions
+
+## Available Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Latest stable Creality Print release (recommended) |
+| `prerelease` | Latest pre-release/beta version (experimental) |
+| `vX.X.X` | Specific stable version (e.g., `v7.0.0`) |
+| `vX.X.X-prerelease` | Specific pre-release version |
 
 ## Quick Start
 
@@ -131,6 +141,35 @@ This container automatically checks for and installs the latest Creality Print v
 4. Creality Print starts with the latest version
 
 No manual intervention required - just restart your container to get updates!
+
+## Pre-Release / Beta Versions
+
+Want to try the latest features before they're officially released? Use the `prerelease` tag:
+
+### Docker Compose (Pre-Release)
+
+```yaml
+services:
+  crealityprint:
+    image: ghcr.io/riddix/docker-creality-slicer-master:prerelease
+    container_name: crealityprint-beta
+    # ... rest of your configuration
+```
+
+### Docker CLI (Pre-Release)
+
+```bash
+docker pull ghcr.io/riddix/docker-creality-slicer-master:prerelease
+```
+
+### Switch Between Stable and Pre-Release
+
+| From | To | Command |
+|------|-----|---------|
+| Stable → Pre-Release | `docker pull ghcr.io/riddix/docker-creality-slicer-master:prerelease` | Then recreate container |
+| Pre-Release → Stable | `docker pull ghcr.io/riddix/docker-creality-slicer-master:latest` | Then recreate container |
+
+> ⚠️ **Warning:** Pre-release versions may contain bugs or incomplete features. Your printer settings are preserved when switching between versions.
 
 ## Stability Watchdog
 

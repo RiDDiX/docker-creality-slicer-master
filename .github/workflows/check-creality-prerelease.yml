@@ -1,0 +1,186 @@
+name: Check Creality Print Pre-Release
+
+on:
+  schedule:
+    # Run daily at 7:00 UTC (1 hour after stable release check)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if version exists'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  check-and-build-prerelease:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        id: repo
+        run: echo "IMAGE_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
+      - name: Get latest Creality Print pre-release
+        id: creality_prerelease
+        run: |
+          # Get the latest pre-release (not the latest stable release)
+          PRERELEASE_DATA=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases" | jq -r '[.[] | select(.prerelease == true)] | first')
+          
+          if [ "$PRERELEASE_DATA" = "null" ] || [ -z "$PRERELEASE_DATA" ]; then
+            echo "No pre-release found"
+            echo "has_prerelease=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          PRERELEASE_VERSION=$(echo "$PRERELEASE_DATA" | jq -r '.tag_name')
+          PRERELEASE_URL=$(echo "$PRERELEASE_DATA" | jq -r '.assets[] | select(.name | test("x86_64.*AppImage$")) | .browser_download_url')
+          
+          echo "prerelease_version=${PRERELEASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "prerelease_url=${PRERELEASE_URL}" >> $GITHUB_OUTPUT
+          echo "has_prerelease=true" >> $GITHUB_OUTPUT
+          echo "Latest Creality Print pre-release: ${PRERELEASE_VERSION}"
+
+      - name: Check if pre-release image exists
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true'
+        id: check_prerelease
+        run: |
+          VERSION="${{ steps.creality_prerelease.outputs.prerelease_version }}"
+          FORCE="${{ github.event.inputs.force_rebuild }}"
+          
+          # Check if Docker image with this pre-release tag exists
+          TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
+          IMAGE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ steps.repo.outputs.IMAGE_NAME }}/manifests/${VERSION}-prerelease" 2>/dev/null || echo "404")
+          
+          # Also check GitHub release
+          RELEASE_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${VERSION}-prerelease")
+          
+          if [ "$FORCE" = "true" ]; then
+            echo "Force rebuild requested"
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          elif [ "$RELEASE_EXISTS" = "200" ]; then
+            echo "Pre-release ${VERSION} already exists - skipping build"
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Pre-release ${VERSION} does not exist - triggering build"
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up QEMU
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image (Pre-Release)
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.IMAGE_NAME }}:prerelease
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.IMAGE_NAME }}:${{ steps.creality_prerelease.outputs.prerelease_version }}-prerelease
+          build-args: |
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+            VERSION=${{ steps.creality_prerelease.outputs.prerelease_version }}-prerelease
+            CREALITY_DOWNLOAD_URL=${{ steps.creality_prerelease.outputs.prerelease_url }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Delete existing pre-release if force rebuild
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true' && github.event.inputs.force_rebuild == 'true'
+        continue-on-error: true
+        run: |
+          VERSION="${{ steps.creality_prerelease.outputs.prerelease_version }}-prerelease"
+          RELEASE_ID=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${VERSION}" | jq -r '.id')
+          
+          if [ "$RELEASE_ID" != "null" ]; then
+            curl -X DELETE \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}"
+            echo "Deleted existing pre-release ${VERSION}"
+          fi
+
+      - name: Create GitHub Pre-Release
+        if: steps.creality_prerelease.outputs.has_prerelease == 'true' && steps.check_prerelease.outputs.needs_build == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.creality_prerelease.outputs.prerelease_version }}-prerelease
+          name: "🧪 Creality Print ${{ steps.creality_prerelease.outputs.prerelease_version }} (Pre-Release)"
+          body: |
+            ## 🧪 Pre-Release Docker Image for Creality Print ${{ steps.creality_prerelease.outputs.prerelease_version }}
+            
+            > ⚠️ **This is a pre-release version.** It may contain bugs or incomplete features. Use at your own risk.
+            
+            ### Pull the pre-release image
+            ```bash
+            docker pull ghcr.io/${{ steps.repo.outputs.IMAGE_NAME }}:prerelease
+            ```
+            
+            Or use the specific version tag:
+            ```bash
+            docker pull ghcr.io/${{ steps.repo.outputs.IMAGE_NAME }}:${{ steps.creality_prerelease.outputs.prerelease_version }}-prerelease
+            ```
+            
+            ### Switch back to stable
+            ```bash
+            docker pull ghcr.io/${{ steps.repo.outputs.IMAGE_NAME }}:latest
+            ```
+            
+            ### Changes
+            See the [Creality Print pre-release notes](https://github.com/CrealityOfficial/CrealityPrint/releases/tag/${{ steps.creality_prerelease.outputs.prerelease_version }}) for details.
+            
+            ### Features
+            - Automatic updates on container restart
+            - Intel iGPU optimizations (VA-API, Mesa iris driver)
+            - Nvidia GPU support
+            - Stability watchdog for automatic hang recovery
+            - Memory management improvements
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Check Creality Print Pre-Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Has Pre-Release:** ${{ steps.creality_prerelease.outputs.has_prerelease }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.creality_prerelease.outputs.has_prerelease }}" = "true" ]; then
+            echo "- **Pre-Release Version:** ${{ steps.creality_prerelease.outputs.prerelease_version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Needs Build:** ${{ steps.check_prerelease.outputs.needs_build }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Force Rebuild:** ${{ github.event.inputs.force_rebuild }}" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.check_prerelease.outputs.needs_build }}" = "true" ]; then
+              echo "- **Action:** Built and pushed pre-release image" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Action:** No build needed, pre-release already exists" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Action:** No pre-release available from Creality" >> $GITHUB_STEP_SUMMARY
+          fi
