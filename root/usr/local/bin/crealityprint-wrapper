@@ -9,33 +9,35 @@ if [ -f /etc/profile.d/intel-gpu.sh ]; then
 fi
 
 # Ensure persistent storage for Creality Print settings
-# Fix any broken symlinks in /config first (from previous buggy versions)
-for path in /config/.config/CrealityPrint /config/.local/share/CrealityPrint /config/.config/Creality /config/.cache; do
+# Fix any broken/self-referential symlinks in /config first
+for path in /config/.config/CrealityPrint /config/.local/share/CrealityPrint /config/.config/Creality; do
     if [ -L "$path" ]; then
         echo "Removing broken symlink: $path"
         rm -f "$path"
     fi
 done
 
-# Create real directories in /config
+# Create real directories in /config for persistent storage
 mkdir -p /config/.config/CrealityPrint
 mkdir -p /config/.local/share/CrealityPrint
 mkdir -p /config/.config/Creality
 mkdir -p /config/.cache
 
-# Create symlinks from home directory to /config for persistence
-mkdir -p "$HOME/.config"
-mkdir -p "$HOME/.local/share"
+# Only create symlinks if HOME is NOT /config (avoid self-referential symlinks)
+if [ "$HOME" != "/config" ]; then
+    mkdir -p "$HOME/.config"
+    mkdir -p "$HOME/.local/share"
 
-# Remove any existing files/dirs and create symlinks
-rm -rf "$HOME/.config/CrealityPrint" 2>/dev/null
-ln -sf /config/.config/CrealityPrint "$HOME/.config/CrealityPrint"
+    # Remove any existing files/dirs and create symlinks
+    rm -rf "$HOME/.config/CrealityPrint" 2>/dev/null
+    ln -sf /config/.config/CrealityPrint "$HOME/.config/CrealityPrint"
 
-rm -rf "$HOME/.local/share/CrealityPrint" 2>/dev/null
-ln -sf /config/.local/share/CrealityPrint "$HOME/.local/share/CrealityPrint"
+    rm -rf "$HOME/.local/share/CrealityPrint" 2>/dev/null
+    ln -sf /config/.local/share/CrealityPrint "$HOME/.local/share/CrealityPrint"
 
-rm -rf "$HOME/.config/Creality" 2>/dev/null
-ln -sf /config/.config/Creality "$HOME/.config/Creality"
+    rm -rf "$HOME/.config/Creality" 2>/dev/null
+    ln -sf /config/.config/Creality "$HOME/.config/Creality"
+fi
 
 # Set XDG directories to ensure apps use /config
 export XDG_CONFIG_HOME=/config/.config
