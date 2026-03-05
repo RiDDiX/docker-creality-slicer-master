@@ -2,6 +2,8 @@ services:
   crealityprint:
     image: ghcr.io/riddix/docker-creality-slicer-master:latest
     container_name: crealityprint
+    # Use host network for proper printer communication (UDP broadcasts)
+    network_mode: host
     environment:
       - PUID=1000
       - PGID=1000
@@ -11,9 +13,8 @@ services:
       - DRI_NODE=/dev/dri/renderD128
     volumes:
       - ./config:/config
-    ports:
-      - 3000:3000
-      - 3001:3001
+    # ports not needed with network_mode: host (uses host ports directly)
+    # Access via http://localhost:3000 and https://localhost:3001
     devices:
       - /dev/dri:/dev/dri
     shm_size: 4gb

@@ -171,6 +171,39 @@ docker pull ghcr.io/riddix/docker-creality-slicer-master:prerelease
 
 > ⚠️ **Warning:** Pre-release versions may contain bugs or incomplete features. Your printer settings are preserved when switching between versions.
 
+## Network Configuration for Printer Communication
+
+Creality printers communicate via UDP broadcasts for file transfers and status updates. If you experience issues with:
+- **File uploads hanging** at "Uploading" even though G-Code arrives
+- **Printer not responding** to commands from the slicer
+- **LAN printer discovery** not working
+
+Use `network_mode: host` for proper UDP broadcast communication:
+
+```yaml
+services:
+  crealityprint:
+    image: ghcr.io/riddix/docker-creality-slicer-master:latest
+    container_name: crealityprint
+    network_mode: host  # Required for UDP broadcast to printers
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - DRINODE=/dev/dri/renderD128
+      - DRI_NODE=/dev/dri/renderD128
+    volumes:
+      - ./config:/config
+    # Note: ports mapping not needed with network_mode: host
+    # Access via http://localhost:3000 and https://localhost:3001
+    devices:
+      - /dev/dri:/dev/dri
+    shm_size: 4gb
+    restart: unless-stopped
+```
+
+> **Note:** With `network_mode: host`, the container uses the host's network directly. Ports 3000 and 3001 are exposed on the host without explicit mapping.
+
 ## Stability Watchdog
 
 The container includes an intelligent watchdog service that monitors Creality Print and automatically recovers from common issues:
