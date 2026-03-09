@@ -22,6 +22,7 @@ mkdir -p /config/.config/CrealityPrint
 mkdir -p /config/.local/share/CrealityPrint
 mkdir -p /config/.config/Creality
 mkdir -p /config/.cache
+mkdir -p /config/.local/share/CrealityPrint/resources
 
 # Only create symlinks if HOME is NOT /config (avoid self-referential symlinks)
 if [ "$HOME" != "/config" ]; then
@@ -44,10 +45,6 @@ export XDG_CONFIG_HOME=/config/.config
 export XDG_DATA_HOME=/config/.local/share
 export XDG_CACHE_HOME=/config/.cache
 
-# Set process limits to prevent runaway memory usage (ignore errors in containers)
-ulimit -v 8388608 2>/dev/null || true
-ulimit -m 4194304 2>/dev/null || true
-
 # Log GPU status
 echo "Starting Creality Print with Intel iGPU optimizations..."
 echo "DRI_NODE: ${DRI_NODE:-not set}"
@@ -56,6 +53,24 @@ echo "MESA_LOADER_DRIVER_OVERRIDE: ${MESA_LOADER_DRIVER_OVERRIDE:-not set}"
 
 # Determine installation directory
 INSTALL_DIR="${CREALITY_INSTALL_DIR:-/opt/crealityprint}"
+
+# Persist parameter/resource updates: symlink resources to /config so
+# filament profile updates survive container restarts
+if [ -d "$INSTALL_DIR/resources" ] && [ ! -L "$INSTALL_DIR/resources" ]; then
+    # First run: copy bundled resources to persistent storage, then symlink
+    cp -rn "$INSTALL_DIR/resources/"* /config/.local/share/CrealityPrint/resources/ 2>/dev/null || true
+    rm -rf "$INSTALL_DIR/resources"
+    ln -sf /config/.local/share/CrealityPrint/resources "$INSTALL_DIR/resources"
+elif [ ! -e "$INSTALL_DIR/resources" ]; then
+    # Resources dir missing (e.g. after auto-update): recreate symlink
+    ln -sf /config/.local/share/CrealityPrint/resources "$INSTALL_DIR/resources"
+fi
+
+# Ensure Creality Print can write to its installation directory
+chown -R abc:abc "$INSTALL_DIR" 2>/dev/null || true
+
+# Ensure D-Bus session bus is available for Creality Print IPC
+export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
 # Launch Creality Print with optimized settings
 cd "$INSTALL_DIR"
