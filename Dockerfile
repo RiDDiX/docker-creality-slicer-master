@@ -59,9 +59,6 @@ RUN \
   curl -fsSL https://packages.mozilla.org/apt/repo-signing-key.gpg | gpg --dearmor -o /etc/apt/keyrings/packages.mozilla.org.gpg && \
   echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.gpg] https://packages.mozilla.org/apt mozilla main" > /etc/apt/sources.list.d/mozilla.list && \
   echo 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000' > /etc/apt/preferences.d/mozilla && \
-  echo "**** add Ubuntu Jammy repo for libwebkit2gtk-4.0 (removed from Noble) ****" && \
-  echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu/ jammy-updates main" > /etc/apt/sources.list.d/jammy-webkit.list && \
-  printf 'Package: *\nPin: release n=jammy*\nPin-Priority: 100\n\nPackage: libwebkit2gtk-4.0* libjavascriptcoregtk-4.0*\nPin: release n=jammy*\nPin-Priority: 500\n' > /etc/apt/preferences.d/jammy-webkit && \
   apt-get update && \
   DEBIAN_FRONTEND=noninteractive \
   apt-get install --no-install-recommends -y \
@@ -82,13 +79,22 @@ RUN \
     avahi-daemon \
     avahi-utils \
     libnss-mdns \
-    libwebkit2gtk-4.0-37 \
     libwebkit2gtk-4.1-0 \
     libwx-perl \
     jq \
     fuse \
     libfuse2 \
     dos2unix && \
+  echo "**** install libwebkit2gtk-4.0 from Ubuntu Jammy (removed from Noble) ****" && \
+  echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu/ jammy main" > /etc/apt/sources.list.d/jammy-webkit.list && \
+  echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu/ jammy-updates main" >> /etc/apt/sources.list.d/jammy-webkit.list && \
+  printf 'Package: *\nPin: release n=jammy*\nPin-Priority: 1\n' > /etc/apt/preferences.d/jammy-webkit && \
+  apt-get update && \
+  mkdir -p /tmp/webkit-debs && cd /tmp/webkit-debs && \
+  apt-get download libicu70 libjavascriptcoregtk-4.0-18 libwebkit2gtk-4.0-37 && \
+  dpkg --force-depends -i /tmp/webkit-debs/*.deb && \
+  rm -rf /tmp/webkit-debs && \
+  rm -f /etc/apt/sources.list.d/jammy-webkit.list /etc/apt/preferences.d/jammy-webkit && \
   echo "**** install initial Creality Print from AppImage ****" && \
   CREALITY_VERSION=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
     | jq -r '.tag_name') && \
@@ -104,8 +110,6 @@ RUN \
   localedef -i en_GB -f UTF-8 en_GB.UTF-8 && \
   printf "RiDDiX Creality Slicer version: ${VERSION}\nBuild-date: ${BUILD_DATE}" > /build_version && \
   echo "**** cleanup ****" && \
-  rm -f /etc/apt/sources.list.d/jammy-webkit.list \
-    /etc/apt/preferences.d/jammy-webkit && \
   apt-get autoclean && \
   rm -rf \
     /config/.cache \
