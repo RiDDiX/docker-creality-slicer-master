@@ -72,6 +72,15 @@ chown -R abc:abc "$INSTALL_DIR" 2>/dev/null || true
 # Ensure D-Bus session bus is available for Creality Print IPC
 export DBUS_SYSTEM_BUS_ADDRESS=unix:path=/run/dbus/system_bus_socket
 
+# Disable WebKit2GTK bubblewrap sandbox (cannot run inside Docker without
+# CAP_SYS_ADMIN / user namespaces — causes embedded web views to hang)
+export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+
+# Disable QtWebEngine Chromium sandbox (same container limitation)
+export QTWEBENGINE_DISABLE_SANDBOX=1
+export QTWEBENGINE_CHROMIUM_FLAGS="--no-sandbox --disable-gpu-sandbox"
+
 # Launch Creality Print with optimized settings
 cd "$INSTALL_DIR"
 
