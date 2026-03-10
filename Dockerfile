@@ -134,8 +134,10 @@ RUN dos2unix /usr/local/bin/crealityprint-wrapper && \
     dos2unix /etc/s6-overlay/s6-rc.d/svc-dbus/type && \
     dos2unix /defaults/autostart && \
     dos2unix /defaults/autostart_wayland && \
+    dos2unix /usr/local/bin/creality-diagnose && \
     chmod +x /usr/local/bin/crealityprint-wrapper && \
     chmod +x /usr/local/bin/creality-autoupdate && \
+    chmod +x /usr/local/bin/creality-diagnose && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-intel-gpu/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-creality-update/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/run && \

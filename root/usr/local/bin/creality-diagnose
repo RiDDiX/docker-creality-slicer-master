@@ -1,0 +1,101 @@
+#!/bin/bash
+# Creality Print Container Diagnostics
+# Run inside container: docker exec -it crealityprint creality-diagnose
+
+echo "========================================"
+echo " Creality Print Container Diagnostics"
+echo "========================================"
+echo ""
+
+INSTALL_DIR="${CREALITY_INSTALL_DIR:-/opt/crealityprint}"
+
+echo "--- 1. Web Engine Detection ---"
+echo "Checking what web engine the AppImage bundles..."
+echo ""
+echo "QtWebEngine (Chromium-based):"
+find "$INSTALL_DIR" -name "*QtWebEngine*" -o -name "*qtwebengine*" -o -name "QtWebEngineProcess" 2>/dev/null | head -20
+echo ""
+echo "CEF (Chromium Embedded Framework):"
+find "$INSTALL_DIR" -name "libcef*" -o -name "cef_*" -o -name "CefSharp*" 2>/dev/null | head -20
+echo ""
+echo "WebKit/GTK:"
+find "$INSTALL_DIR" -name "*webkit*" -o -name "*WebKit*" 2>/dev/null | head -20
+echo ""
+echo "Chromium/Electron:"
+find "$INSTALL_DIR" -name "chrome-sandbox" -o -name "electron" -o -name "libchromium*" 2>/dev/null | head -20
+echo ""
+
+echo "--- 2. Shared Libraries (web-related) ---"
+echo "AppImage lib directory:"
+ls "$INSTALL_DIR/lib/" 2>/dev/null | grep -iE "webkit|webengine|cef|chromium|icu|qt.*web" | head -20
+echo ""
+echo "System webkit libraries:"
+ldconfig -p 2>/dev/null | grep -iE "webkit|webengine" | head -10
+echo ""
+
+echo "--- 3. Network Connectivity ---"
+echo "DNS resolution:"
+for host in model.creality.com www.crealitycloud.com api.crealitycloud.com; do
+    result=$(getent hosts "$host" 2>&1)
+    echo "  $host -> $result"
+done
+echo ""
+
+echo "HTTPS connectivity:"
+for url in https://model.creality.com https://www.crealitycloud.com; do
+    code=$(curl -so /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 10 "$url" 2>&1)
+    echo "  $url -> HTTP $code"
+done
+echo ""
+
+echo "General internet (Google DNS):"
+ping -c 1 -W 3 8.8.8.8 > /dev/null 2>&1 && echo "  OK" || echo "  FAILED"
+echo ""
+
+echo "--- 4. D-Bus Status ---"
+echo "System bus socket:"
+ls -la /run/dbus/system_bus_socket 2>/dev/null || echo "  NOT FOUND"
+echo ""
+echo "D-Bus processes:"
+ps aux 2>/dev/null | grep -i dbus | grep -v grep
+echo ""
+
+echo "--- 5. Environment Variables (web/sandbox) ---"
+env | grep -iE "WEBKIT|WEBENGINE|SANDBOX|DBUS|DISPLAY|QT_QPA|GDK" | sort
+echo ""
+
+echo "--- 6. Running Processes ---"
+ps aux 2>/dev/null | grep -iE "creality|webkit|webengine|cef|chrome" | grep -v grep
+echo ""
+
+echo "--- 7. AppImage Binary Info ---"
+echo "Main binary:"
+file "$INSTALL_DIR/bin/CrealityPrint" 2>/dev/null
+echo ""
+echo "Linked web libraries:"
+ldd "$INSTALL_DIR/bin/CrealityPrint" 2>/dev/null | grep -iE "webkit|webengine|cef|icu|chromium" | head -20
+echo ""
+echo "AppRun:"
+file "$INSTALL_DIR/AppRun" 2>/dev/null
+echo ""
+
+echo "--- 8. Log Files ---"
+echo "Creality Print logs:"
+find /config -name "*.log" -path "*reality*" -newer /proc/1/cmdline 2>/dev/null | head -10
+for logfile in $(find /config -name "*.log" -path "*reality*" -newer /proc/1/cmdline 2>/dev/null | head -3); do
+    echo ""
+    echo "=== Last 30 lines of $logfile ==="
+    tail -30 "$logfile" 2>/dev/null
+done
+echo ""
+
+echo "--- 9. Stderr capture (5 seconds) ---"
+echo "Starting CrealityPrint briefly to capture stderr..."
+echo "(This will show library loading errors)"
+cd "$INSTALL_DIR"
+timeout 5 "$INSTALL_DIR/bin/CrealityPrint" 2>&1 | head -50 || true
+echo ""
+
+echo "========================================"
+echo " Diagnostics complete"
+echo "========================================"
