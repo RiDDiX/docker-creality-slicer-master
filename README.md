@@ -179,7 +179,7 @@ docker pull ghcr.io/riddix/docker-creality-slicer-master:prerelease
 
 ## Network Configuration for Printer Communication
 
-Creality Print communicates with printers via **TCP/9999** (file transfer) and uses **UDP/5353** (mDNS) for printer discovery on the local network. The default bridge mode configuration exposes all required ports.
+Creality Print communicates with printers via **TCP/9999** (file transfer) and uses **UDP/5353** (mDNS) for automatic printer discovery on the local network.
 
 ### Required Ports
 
@@ -190,21 +190,9 @@ Creality Print communicates with printers via **TCP/9999** (file transfer) and u
 | `9999` | TCP | Printer file transfer |
 | `5353` | UDP | mDNS printer discovery |
 
-### Bridge Mode (Default)
+### Host Mode (Recommended for Printer Communication)
 
-The default `docker-compose.yml` uses bridge networking with all required ports mapped. If ports 3000/3001 are already in use on your host, remap them:
-
-```yaml
-ports:
-  - 8000:3000   # remap web UI HTTP to 8000
-  - 8001:3001   # remap web UI HTTPS to 8001
-  - 9999:9999
-  - 5353:5353/udp
-```
-
-### Host Mode (Alternative)
-
-If printer communication does not work in bridge mode, try `network_mode: host`:
+For full printer functionality (auto-discovery, file upload, status feedback), use `network_mode: host`. This places the container on the same broadcast domain as your printers, enabling mDNS multicast and direct TCP communication.
 
 ```yaml
 services:
@@ -220,7 +208,6 @@ services:
       - DRI_NODE=/dev/dri/renderD128
     volumes:
       - ./config:/config
-    # ports mapping not needed with network_mode: host
     devices:
       - /dev/dri:/dev/dri
     shm_size: 4gb
@@ -228,6 +215,25 @@ services:
 ```
 
 > **Note:** With `network_mode: host`, the container uses the host's network directly. Ports 3000 and 3001 must be free on the host.
+
+### Bridge Mode (Default)
+
+The default `docker-compose.yml` uses bridge networking. This works for the web UI and cloud features, but has **limitations for LAN printer communication**:
+
+- **mDNS auto-discovery does not work** — Docker bridge mode cannot forward multicast traffic (`224.0.0.251:5353`). You must add printers by IP address manually in Creality Print.
+- **File uploads may hang** — Some printers open a callback connection to report upload status. In bridge mode, this callback may not reach the container.
+
+If ports 3000/3001 are already in use on your host, remap them:
+
+```yaml
+ports:
+  - 8000:3000   # remap web UI HTTP to 8000
+  - 8001:3001   # remap web UI HTTPS to 8001
+  - 9999:9999
+  - 5353:5353/udp
+```
+
+> **Tip:** If you experience upload issues in bridge mode, switch to `network_mode: host`.
 
 ## Stability Watchdog
 
@@ -399,6 +405,7 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 
 ## Versions
 
+- **20.03.26:** - Audit: Remove unnecessary libwebkit2gtk-4.0 Jammy install (app uses 4.1), add Avahi mDNS service, clean up sandbox env vars, fix network mode documentation, add alpha CI builds
 - **09.03.26:** - Fix: Restore D-Bus service for printer communication, add avahi/mDNS for printer discovery, persist filament parameter updates, expose printer ports (TCP/9999, UDP/5353)
 - **16.01.26:** - Fork: Convert from OrcaSlicer to Creality Print with auto-update feature
 - **15.01.26:** - Add Intel iGPU optimizations, VA-API drivers, stability watchdog, and memory management

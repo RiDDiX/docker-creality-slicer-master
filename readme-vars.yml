@@ -25,7 +25,7 @@ param_ports:
   - {external_port: "3000", internal_port: "3000", port_desc: "Creality Print desktop gui HTTP, must be proxied."}
   - {external_port: "3001", internal_port: "3001", port_desc: "Creality Print desktop gui HTTPS."}
 opt_custom_params:
-  - {name: "shm-size", name_compose: "shm_size", value: "1gb", desc: "We set this to 1 gig to prevent modern web browsers from crashing"}
+  - {name: "shm-size", name_compose: "shm_size", value: "4gb", desc: "Shared memory for WebGL/GPU acceleration and large model handling"}
 # Selkies blurb settings
 selkies_blurb: true
 show_nvidia: true

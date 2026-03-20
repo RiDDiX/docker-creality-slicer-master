@@ -89,11 +89,19 @@ for logfile in $(find /config -name "*.log" -path "*reality*" -newer /proc/1/cmd
 done
 echo ""
 
-echo "--- 9. Stderr capture (5 seconds) ---"
+echo "--- 9. Avahi / mDNS Status ---"
+echo "Avahi daemon:"
+pgrep -la avahi 2>/dev/null || echo "  NOT RUNNING (mDNS discovery requires network_mode: host)"
+echo ""
+echo "mDNS browse (3s timeout):"
+avahi-browse -at --timeout=3 2>&1 | head -20 || echo "  avahi-browse failed or no results"
+echo ""
+
+echo "--- 10. Stderr capture (5 seconds) ---"
 echo "Starting CrealityPrint briefly to capture stderr..."
 echo "(This will show library loading errors)"
 cd "$INSTALL_DIR"
-timeout 5 "$INSTALL_DIR/bin/CrealityPrint" 2>&1 | head -50 || true
+timeout 5 "$INSTALL_DIR/AppRun" 2>&1 | head -50 || true
 echo ""
 
 echo "========================================"

@@ -85,16 +85,6 @@ RUN \
     fuse \
     libfuse2 \
     dos2unix && \
-  echo "**** install libwebkit2gtk-4.0 from Ubuntu Jammy (removed from Noble) ****" && \
-  echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu/ jammy main" > /etc/apt/sources.list.d/jammy-webkit.list && \
-  echo "deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] http://archive.ubuntu.com/ubuntu/ jammy-updates main" >> /etc/apt/sources.list.d/jammy-webkit.list && \
-  printf 'Package: *\nPin: release n=jammy*\nPin-Priority: 1\n' > /etc/apt/preferences.d/jammy-webkit && \
-  apt-get update && \
-  mkdir -p /tmp/webkit-debs && cd /tmp/webkit-debs && \
-  apt-get download libicu70 libjavascriptcoregtk-4.0-18 libwebkit2gtk-4.0-37 && \
-  dpkg --force-depends -i /tmp/webkit-debs/*.deb && \
-  rm -rf /tmp/webkit-debs && \
-  rm -f /etc/apt/sources.list.d/jammy-webkit.list /etc/apt/preferences.d/jammy-webkit && \
   echo "**** install initial Creality Print from AppImage ****" && \
   CREALITY_VERSION=$(curl -sX GET "https://api.github.com/repos/CrealityOfficial/CrealityPrint/releases/latest" \
     | jq -r '.tag_name') && \
@@ -132,6 +122,8 @@ RUN dos2unix /usr/local/bin/crealityprint-wrapper && \
     dos2unix /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/type && \
     dos2unix /etc/s6-overlay/s6-rc.d/svc-dbus/run && \
     dos2unix /etc/s6-overlay/s6-rc.d/svc-dbus/type && \
+    dos2unix /etc/s6-overlay/s6-rc.d/svc-avahi/run && \
+    dos2unix /etc/s6-overlay/s6-rc.d/svc-avahi/type && \
     dos2unix /defaults/autostart && \
     dos2unix /defaults/autostart_wayland && \
     dos2unix /usr/local/bin/creality-diagnose && \
@@ -141,8 +133,9 @@ RUN dos2unix /usr/local/bin/crealityprint-wrapper && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-intel-gpu/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/init-creality-update/run && \
     chmod +x /etc/s6-overlay/s6-rc.d/svc-creality-watchdog/run && \
-    chmod +x /etc/s6-overlay/s6-rc.d/svc-dbus/run
+    chmod +x /etc/s6-overlay/s6-rc.d/svc-dbus/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/svc-avahi/run
 
 # ports and volumes
-EXPOSE 3000 3001 9999
+EXPOSE 3000 3001 9999 5353/udp
 VOLUME /config

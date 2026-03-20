@@ -1,0 +1,36 @@
+#!/usr/bin/with-contenv bash
+
+# Avahi mDNS daemon for printer discovery on the local network
+# Only functional with network_mode: host (bridge mode cannot do multicast)
+
+mkdir -p /var/run/avahi-daemon
+chown abc:abc /var/run/avahi-daemon
+
+# Configure avahi for container environment
+mkdir -p /etc/avahi
+cat > /etc/avahi/avahi-daemon.conf << 'EOF'
+[server]
+use-ipv4=yes
+use-ipv6=yes
+allow-interfaces=eth0,eno1,enp0s3,br0,wlan0
+ratelimit-interval-usec=1000000
+ratelimit-burst=1000
+
+[wide-area]
+enable-wide-area=yes
+
+[publish]
+publish-hinfo=no
+publish-workstation=no
+
+[reflector]
+
+[rlimits]
+EOF
+
+exec s6-setuidgid abc \
+  avahi-daemon \
+    --no-drop-root \
+    --no-chroot \
+    --no-rlimits \
+    -f /etc/avahi/avahi-daemon.conf
